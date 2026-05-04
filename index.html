@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kogane -- CT Log Threat Hunter</title>
+<!-- Kogane -- Certificate Transparency Threat Hunter | Developed by Max Malz | MIT License -->
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f5f5f5;--bg3:#eee;--bg4:#e4e4e4;
+  --text:#000;--text2:#555;--text3:#999;
+  --border:#ccc;--border2:#888;
+  --red:#aa0000;--orange:#884400;--yellow:#665500;--green:#004400;
+  --hit-bg:#f0fff0;--hit-border:#88bb88;
+  --font:'Cascadia Code','Fira Code',Consolas,'Courier New',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;overflow:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;background:#fff;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:opacity .45s ease;overflow:hidden}
+#splash.out{opacity:0;pointer-events:none}
+#splash-art{font-family:var(--font);font-size:5.4px;line-height:1.18;color:#000;white-space:pre;letter-spacing:0;user-select:none}
+#splash-cta{margin-top:20px;font-size:10px;letter-spacing:3px;color:var(--text3);animation:breathe 1.8s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* ── HEADER ── */
+#hdr{display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:2px solid var(--text);background:var(--bg);flex-shrink:0;user-select:none}
+.logo{display:flex;align-items:center;gap:8px;cursor:pointer;color:inherit;text-decoration:none}
+.logo-art{font-size:4.6px;line-height:1.12;white-space:pre;color:#000;letter-spacing:0;font-family:var(--font)}
+.logo-name{font-size:13px;font-weight:700;letter-spacing:4px;color:#000}
+.badge{font-size:8px;letter-spacing:1.5px;padding:2px 7px;border:1px solid var(--border2);color:var(--text2);background:var(--bg2);border-radius:1px}
+.conn-wrap{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:1px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.dot.live{background:var(--green);animation:blink 2s infinite}
+.dot.sim{background:var(--orange);animation:blink 3s infinite}
+.dot.err{background:var(--red)}
+.dot.try{background:var(--yellow);animation:blink .6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+.hdr-stats{display:flex;gap:18px;margin-left:auto}
+.sblock{display:flex;flex-direction:column;align-items:flex-end}
+.sval{font-size:14px;font-weight:700;color:var(--text);line-height:1}
+.sval.red{color:var(--orange)}
+.slbl{font-size:8px;letter-spacing:.7px;color:var(--text3);margin-top:2px}
+.hdr-btn{font-family:var(--font);font-size:9px;letter-spacing:.5px;padding:2px 8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;border-radius:1px}
+.hdr-btn:hover{border-color:var(--text);color:var(--text)}
+.hdr-btn.guide-btn{border-color:var(--text);color:var(--text);font-weight:700}
+
+/* ── LAYOUT ── */
+#app{height:calc(100vh - 40px);display:flex}
+
+/* ── SIDEBAR ── */
+#sb{width:205px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.ptitle{padding:5px 11px;font-size:8px;letter-spacing:2px;color:var(--text3);background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+#wl-items{flex:1;overflow-y:auto;padding:7px}
+.we{display:flex;align-items:center;gap:5px;padding:4px 7px;margin-bottom:3px;background:var(--bg2);border:1px solid var(--border);border-radius:1px;animation:slin .15s ease}
+@keyframes slin{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+.wp{flex:1;font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt{font-size:8px;color:var(--text3);padding:1px 3px;border:1px solid var(--border);border-radius:1px;flex-shrink:0}
+.wd{background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;font-family:var(--font);flex-shrink:0}
+.wd:hover{color:var(--red)}
+.wl-empty{color:var(--text3);font-size:10px;padding:10px;line-height:1.8}
+#add-form{padding:7px;border-top:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.afl{font-size:8px;color:var(--text3);letter-spacing:1px}
+.fi{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;padding:4px 7px;width:100%;outline:none;border-radius:1px}
+.fi:focus{border-color:var(--text)}.fi::placeholder{color:var(--text3)}
+.fr{display:flex;gap:4px}
+.fs{background:var(--bg);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:10px;padding:3px 5px;outline:none;flex:1;border-radius:1px}
+.fb{background:var(--text);border:1px solid var(--text);color:var(--bg);font-family:var(--font);font-size:10px;padding:4px 9px;cursor:pointer;border-radius:1px;flex-shrink:0}
+.fb:hover{background:var(--text2);border-color:var(--text2)}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#fbar{display:flex;align-items:center;gap:7px;padding:4px 11px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.flbl{font-size:8px;color:var(--text3);letter-spacing:1px}
+.fbtn{font-family:var(--font);font-size:9px;letter-spacing:.5px;padding:2px 7px;border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;border-radius:1px}
+.fbtn.on{border-color:var(--text);color:var(--text);font-weight:700;background:var(--bg3)}
+.fbtn:hover:not(.on){color:var(--text)}
+#si{margin-left:auto;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:10px;padding:3px 7px;outline:none;border-radius:1px;width:155px}
+#si::placeholder{color:var(--text3)}#si:focus{border-color:var(--text)}
+#feed{flex:1;overflow-y:auto}
+.fempty{color:var(--text3);font-size:11px;padding:14px 12px}
+.cr{display:flex;align-items:flex-start;padding:3px 11px;border-bottom:1px solid var(--border);min-height:24px;animation:fin .18s ease}
+@keyframes fin{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
+.cr.hit{background:var(--hit-bg);border-bottom-color:var(--hit-border);cursor:pointer;animation:hf .5s ease}
+.cr.hit:hover{background:#e0fae0}
+@keyframes hf{0%{background:#bbffbb}100%{background:var(--hit-bg)}}
+.cts{width:64px;flex-shrink:0;color:var(--text3);padding-top:2px;font-size:11px}
+.cfl{width:22px;flex-shrink:0;font-size:10px;font-weight:700;color:var(--green);padding-top:2px}
+.cdo{flex:1;min-width:0}
+.cdm{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.6}
+.cdm.h{color:var(--text);font-weight:700}
+.pls{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;margin-bottom:2px}
+.pl{font-size:9px;padding:1px 5px;border-radius:1px}
+.pl-l{background:#e0ffe0;color:var(--green);border:1px solid #88bb88;font-weight:600}
+.pl-w{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.pl-s{background:var(--bg3);border:1px solid var(--border);font-weight:700}
+.cis{width:92px;flex-shrink:0;color:var(--text3);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:2px;text-align:right}
+
+/* ── DETAIL ── */
+#detail{border-top:2px solid var(--text);background:var(--bg2);padding:9px 13px;flex-shrink:0;min-height:115px;max-height:195px;overflow-y:auto}
+.dp{color:var(--text3);font-size:11px;padding:4px 0}
+.dh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex-wrap:wrap}
+.dn{color:var(--text);font-size:13px;font-weight:700}
+.tp{font-size:9px;font-weight:700;padding:2px 6px;border-radius:1px;border:1px solid;letter-spacing:1px}
+.tc{color:var(--red);border-color:var(--red);background:#fff0f0}
+.th{color:var(--orange);border-color:var(--orange);background:#fff5ea}
+.tm{color:var(--yellow);border-color:var(--yellow);background:#fffce5}
+.tl{color:var(--green);border-color:var(--green);background:#f0fff2}
+.dm{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px 13px;margin-bottom:9px}
+.di{display:flex;flex-direction:column}
+.dl{font-size:8px;color:var(--text3);letter-spacing:.7px;margin-bottom:2px}
+.dv{font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrs{display:flex;flex-direction:column;gap:3px}
+.mr{display:flex;align-items:center;gap:7px;padding:3px 7px;background:var(--bg);border:1px solid var(--border);border-radius:1px;font-size:10px}
+.mrd{color:var(--green);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.mrv{color:var(--text3);flex-shrink:0}.mrw{color:var(--text2);flex-shrink:0}.mrl{color:var(--text);flex-shrink:0}
+.mrc{flex-shrink:0;font-weight:700;font-size:11px}
+
+/* ── ALERTS PANEL ── */
+#ap{width:260px;flex-shrink:0;border-left:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+#al{flex:1;overflow-y:auto}
+.ae{color:var(--text3);font-size:10px;padding:13px 11px;line-height:2.1}
+.ar{padding:6px 9px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .08s}
+.ar:hover{background:var(--bg2)}.ar.sel{background:var(--bg3);border-left:3px solid var(--text)}
+.adn{color:var(--text);font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.ab{display:flex;justify-content:space-between;align-items:center}
+.at{font-size:9px;color:var(--text3)}
+
+/* alerts filter bar */
+#af-bar{flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;gap:0}
+.af-row{display:flex;align-items:center;gap:5px;padding:4px 8px;border-bottom:1px solid var(--border)}
+.af-row:last-child{border-bottom:none}
+.af-lbl{font-size:8px;color:var(--text3);letter-spacing:1px;flex-shrink:0;width:34px}
+.af-sel{background:var(--bg);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:9px;padding:2px 4px;outline:none;flex:1;border-radius:1px}
+.af-sel:focus{border-color:var(--text)}
+.af-inp{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:9px;padding:2px 4px;outline:none;flex:1;border-radius:1px;min-width:0}
+.af-inp:focus{border-color:var(--text)}
+.af-inp::placeholder{color:var(--text3)}
+.af-clear{font-family:var(--font);font-size:8px;padding:1px 5px;border:1px solid var(--border2);background:none;color:var(--text3);cursor:pointer;border-radius:1px;flex-shrink:0}
+.af-clear:hover{color:var(--red);border-color:var(--red)}
+.af-count{font-size:8px;color:var(--text3);padding:3px 8px;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--bg);text-align:right}
+
+/* ── GUIDE OVERLAY ── */
+#guide-overlay{position:fixed;inset:0;background:rgba(255,255,255,.96);z-index:900;display:none;flex-direction:column;overflow:hidden}
+#guide-overlay.open{display:flex}
+#guide-hdr{display:flex;align-items:center;padding:10px 16px;border-bottom:2px solid var(--text);flex-shrink:0}
+#guide-title{font-size:13px;font-weight:700;letter-spacing:3px}
+#guide-close{margin-left:auto;font-family:var(--font);font-size:9px;padding:2px 8px;border:1px solid var(--text);background:none;color:var(--text);cursor:pointer;border-radius:1px;letter-spacing:.5px}
+#guide-close:hover{background:var(--text);color:var(--bg)}
+#guide-body{flex:1;overflow-y:auto;padding:18px 22px;max-width:820px}
+.gs{margin-bottom:22px}
+.gs-title{font-size:10px;font-weight:700;letter-spacing:2px;border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:10px}
+.gs-body{font-size:11px;color:var(--text2);line-height:1.9;white-space:pre-wrap}
+.gs-body strong{color:var(--text);font-weight:700}
+
+/* ── HIT NOTIFICATION (buddy) ── */
+#notif-stack{position:fixed;bottom:16px;right:16px;z-index:800;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.notif{
+  background:var(--bg);border:2px solid var(--text);
+  font-family:var(--font);font-size:11px;
+  width:420px;
+  animation:notifIn .25s ease forwards;
+  position:relative;overflow:hidden;
+}
+@keyframes notifIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+.notif.out{animation:notifOut .3s ease forwards}
+@keyframes notifOut{to{opacity:0;transform:translateX(40px)}}
+.notif-inner{display:flex;gap:0}
+.notif-buddy{
+  flex-shrink:0;width:160px;
+  background:#000;
+  border-right:1px solid #000;
+  padding:6px 6px;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+.notif-buddy pre{font-size:2.2px;line-height:1.22;color:#fff;white-space:pre;letter-spacing:0;user-select:none;display:block}
+.notif-content{flex:1;padding:7px 8px;min-width:0}
+.notif-ding{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--text);margin-bottom:5px}
+.notif-level{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border:1px solid;border-radius:1px;letter-spacing:1px;margin-bottom:4px}
+.notif-domain{font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.notif-meta{font-size:9px;color:var(--text2)}
+.notif-close{position:absolute;top:4px;right:5px;background:none;border:none;font-family:var(--font);font-size:13px;color:var(--text3);cursor:pointer;line-height:1;padding:0}
+.notif-close:hover{color:var(--red)}
+.notif-bar{height:3px;background:var(--text);animation:notifBar linear forwards}
+@keyframes notifBar{from{width:100%}to{width:0%}}
+
+/* ── CAPTURE BAR ── */
+#cap-bar{display:flex;align-items:center;gap:8px;padding:5px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.cap-state{font-size:9px;letter-spacing:1.5px;padding:2px 8px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);border-radius:1px;min-width:82px;text-align:center}
+.cap-state.running{border-color:var(--green);color:var(--green)}
+.cap-state.paused{border-color:var(--orange);color:var(--orange)}
+.cap-btn{font-family:var(--font);font-size:9px;letter-spacing:.8px;padding:3px 10px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;border-radius:1px;transition:all .1s}
+.cap-btn:hover{border-color:var(--text);color:var(--text)}
+.cap-btn.go{border-color:var(--green);color:var(--green);font-weight:700}
+.cap-btn.go:hover{background:var(--green);color:#fff}
+.cap-btn.stop{border-color:var(--red);color:var(--red);font-weight:700}
+.cap-btn.stop:hover{background:var(--red);color:#fff}
+.cap-btn.export{border-color:var(--text);color:var(--text);font-weight:700}
+.cap-btn.export:hover{background:var(--text);color:var(--bg)}
+.cap-sep{width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 2px}
+.cap-meta{font-size:9px;color:var(--text3);letter-spacing:.3px}
+#cap-dur{font-weight:700;color:var(--text2)}
+
+/* ── PANEL TITLES WITH CLEAR ── */
+.ptitle{padding:5px 11px;font-size:8px;letter-spacing:2px;color:var(--text3);background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.pt-clr{font-family:var(--font);font-size:8px;padding:1px 5px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;border-radius:1px;letter-spacing:.3px;line-height:1.4}
+.pt-clr:hover{border-color:var(--red);color:var(--red)}
+
+/* ── REPORT MODAL ── */
+#rpt-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:950;display:none;align-items:center;justify-content:center}
+#rpt-modal.open{display:flex}
+#rpt-box{background:var(--bg);border:2px solid var(--text);width:540px;max-width:96vw;display:flex;flex-direction:column;max-height:88vh}
+#rpt-hdr{display:flex;align-items:center;padding:9px 14px;border-bottom:2px solid var(--text);flex-shrink:0;gap:10px}
+#rpt-title{font-size:12px;font-weight:700;letter-spacing:2px}
+#rpt-close{margin-left:auto;font-family:var(--font);font-size:9px;padding:2px 7px;border:1px solid var(--text);background:none;color:var(--text);cursor:pointer;border-radius:1px}
+#rpt-close:hover{background:var(--text);color:var(--bg)}
+#rpt-fmts{display:flex;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);align-items:center}
+.rpt-flbl{font-size:8px;color:var(--text3);letter-spacing:1px;margin-right:4px}
+.fmt-btn{font-family:var(--font);font-size:9px;padding:2px 9px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;border-radius:1px;letter-spacing:.5px}
+.fmt-btn.on{border-color:var(--text);color:var(--text);font-weight:700;background:var(--bg3)}
+.fmt-btn:hover:not(.on){color:var(--text);border-color:var(--text2)}
+#rpt-preview{flex:1;overflow:auto;padding:12px 14px;font-family:var(--font);font-size:10px;line-height:1.7;color:var(--text2);white-space:pre;background:var(--bg)}
+#rpt-footer{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
+#rpt-summary{font-size:9px;color:var(--text3);flex:1}
+.dl-btn{font-family:var(--font);font-size:10px;font-weight:700;padding:4px 14px;border:1px solid var(--text);background:var(--text);color:var(--bg);cursor:pointer;border-radius:1px;letter-spacing:.5px}
+.dl-btn:hover{background:var(--text2);border-color:var(--text2)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(18px);background:var(--text);color:var(--bg);font-family:var(--font);font-size:11px;letter-spacing:.5px;padding:5px 14px;border-radius:2px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;z-index:700}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash" onclick="dismissSplash()">
+<pre id="splash-art">
+                                                                                                    
+   ....                                   ..:=+++++++***+-:...                                      
+   .#+#%%%#=:.....                    ..++:.................:%#..                 ......:-+#%%***.  
+   .:#:........:-+#%%%#*=:..        .==........          .......-+.      ....:=+*+=::.........=#.   
+     .*@%+:.... ..........=#..   ..====+#**..           ..=%*+=-:=-*:  .-+:...............-+=%=.    
+       .*=..+++-.-=:.    ..-#. .=*-.=%@@@@@-..           .=@@@@@@#::+*.-*. ..........-***-:*=.      
+        ..:#%#+===--*%=:. ...##=*:#@@@@@@%:.             ...%@@@@@@%:+++......***:..:+-+%=..        
+            .:+.-+##==-*-...%#.-=%@@@@@%:..   ........   .....*@@@@@%*.:#...*+--=*=:.:#-.           
+              .-%-..=*-=:::%-..:#@@@#-...   ..%@*..*@*..      ...=%@#+...*-+=-:+:..+#:.             
+               ...+#*--*=*%............     ..::......          ....... ..#==*:=#%+..               
+                  .:#:...*...                 ....                      .-*:...=#:.                 
+                    .:+#+*+.                                            :*:-%#-.                    
+                       ...-=..                         ....          ..=%=:...                      
+                          ..+:.      ....-*+..  ....  .:%*:..     ...*=..                           
+                            ..=##*+:-+%#++#*....=%#....*+*+*%*:.:=#*:.                              
+                               .%%***+++:..:#+#:+@@-+*=++#+*++**#%%:.                               
+                               .*%*##-.....-+##:-@#:#++=:...-+***#=.                                
+                                .#*....:++-=+-:#:@-+.++=+-=+....*%.                                 
+                                .-*-:#+.-=:....*+-*-....==:==*==+.                                  
+                                 .*%+--*:..=##++**+++:...-#***-#+.                                  
+                                 .-+..:=##**+*##%%##+:-=::=:*#%-.                                   
+                                   =--:...................=.=+:.                                    
+                                   .**-                  .=-=-.                                     
+                                   .=*=.                 .=*=.                                      
+                                   .-%+..               .-*#.                                       
+                                    :@+:.            ...:#%=.                                       
+                                    .=#++*+=-.   ..::+*#+=%..                                       
+                                    .*=.=+*=......=+===++.+.                                        
+                                    .+*........:-----:..-:=.                                        
+                                     .#..             ..==-.                                        
+                                     .#:.             .-=%:                                         
+                                      +*.             .+=%.                                         
+                                      :@--.........  ..+*.                                          
+                                      .:++===+**=-.-:*+..                                           
+                                         .*%*++*+*##+:.                                             
+                                          .*%**++%*.     .:=**++====:.                              
+                                           :*-+#%#:.    .*@@@@@@@@%..                               
+                                           :@#**%=.     .=@@@@@@@@=.                                
+                                           .:@@*=.        .+@@@@@@-                                 
+                                            :@@:.       ..#@+#@@@#.                                 
+                                            :@%.       .-@#.......                                  
+                                           .:@%.      .*@%.                                         
+                                           .-@%......-%@+.                                          
+                                            .#@@@%@@@%-.                                            
+                                             .-#%#=.                                                
+              .   ..        ........       ......                                .      .           
+        .:@@@@#. .+@@@@*..-#@@@@@@@%-.  .:#@@@@%.        .*@@@@@@.   .-@@@@@@:. .#@@@%..:@@@@@@@@@%.
+        .*@@@@-..*@@@@*..#@@@@@@@@@@%. .#@@@@@@-.       .+@@@@@@#.   .%@@@@@%. .-@@@@-..#@@@@@@@@@=.
+       .:@@@@#..#@@@@*..%@@@@%%@@@@@#..#@@@@%%*.       .=@@@@@@@+.  .=@@@@@@#. .%@@@#..=@@@@@@@@@#. 
+       .#@@@@:.#@@@@+..=@@@@+..#@@@@-.=@@@@+.         .:@@@@%@@@-. .:%@@@@@@*..+@@@@- .%@@@%:    .  
+       =@@@@+.%@@@@=...%@@@%. -@@@@*..%@@@%:          .%@@@+@@@%.  .*@@@@@@@=..%@@@*..+@@@@=.       
+      .%@@@@-%@@@@=. .*@@@@= .#@@@@:.*@@@@=.         .#@@@++@@@*.  :@@@@#@@@-.*@@@%: .%@@@%.....    
+     .+@@@@*%@@@@=.  :@@@@%..=@@@@*.:@@@@#. .----.. .*@@@#:%@@@=. .*@@@%=@@@::@@@@+..+@@@@@@@@@=.   
+     :@@@@@%%%%%-.  .*@@@@-.:%@@@%..*@@@@-..#@@@%. .=@@@%:=@@@@:  -@@@@+=@@%:*@@@%. :@@@@@@@@@#.    
+    .+@@@@=         -@@@@#..+@@@@+ -@@@@*..=@@@@= .-@@@@=.#@@@#. .#@@@%:+@@%-@@@@= .*@@@@@@@@@-     
+   .:@@@@#.        .#@@@@-.:@@@@%..#@@@@: .%@@@%..:%@@@*.:@@@@+..-@@@@=.#@@*#@@@%..:@@@@#.          
+   .*@@@@-        .=@@@@*..*@@@@-.-@@@@*..+@@@@-..#@@@@@@@@@@@- .%@@@#..%@@#@@@@-..#@@@@:           
+  .:@@@@#.        .%@@@%..:@@@@#..%@@@%. :@@@@#..*@@@@@@@@@@@%..=@@@@- :@@@@@@@#..=@@@@*.           
+  .#@@@@:         =@@@@*..#@@@@-.=@@@@+ .#@@@@-.+@@@@@@@@@@@@*.:%@@@#. -@@@@@@@- .%@@@@-.....       
+  =@@@@*.        .#@@@@@@@@@@@+..#@@@@@@@@@@@*.-@@@@#. .*@@@@=.+@@@@:  =@@@@@@*..+@@@@@@@@@*.       
+ .#@@@@:         .#@@@@@@@@@@-.  =@@@@@@@@@@%::@@@@%.  .%@@@@::@@@@*.  +@@@@@@: .%@@@@@@@@@:        
+ :+***-.          .=#@@@@%+:.     .:=+**+=-. .=***+:  .:+***=.-***+.  .=*****=..-*********=.
+</pre>
+  <div id="splash-cta">[ CLICK TO INITIALIZE ]</div>
+</div>
+
+<!-- GUIDE OVERLAY -->
+<div id="guide-overlay">
+  <div id="guide-hdr">
+    <span id="guide-title">KOGANE -- FEATURE GUIDE</span>
+    <button id="guide-close" onclick="closeGuide()">[ CLOSE ]</button>
+  </div>
+  <div id="guide-body">
+
+    <div class="gs">
+      <div class="gs-title">WATCHLIST</div>
+      <div class="gs-body">Your watchlist is the set of patterns Kogane checks every incoming certificate against.
+Patterns are saved to localStorage and persist across sessions.
+
+  <strong>keyword</strong>  --  Matches if the term appears in, or fuzzy-matches a segment of, any domain.
+               Best for brand names, product names, internal codenames.
+               Example: "paypal" catches paypal.com, secure-paypal.net, paypa1.io
+
+  <strong>domain</strong>   --  Checks full domains for exact clone, TLD swap, homoglyph, subdomain abuse, typosquat.
+               Best for specific domains you own or monitor.
+               Example: "google.com" catches g00gle.com, google.net, login.google.com.phish.io
+
+Adding a new pattern immediately re-scores the existing feed.
+Any recent cert matching the new pattern is retroactively flagged.
+
+Click [x] on any entry to remove it.</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">CERTIFICATE FEED  (center)</div>
+      <div class="gs-body">Live stream of incoming TLS certificates, newest at top.
+
+  Normal certs  --  dimmed text, no flag
+  Hit certs     --  bold text, [!] flag, match label + score pills, green background
+
+Click any hit row to open the detail inspector at the bottom.
+
+  <strong>ALL</strong>        -- show every cert in the stream
+  <strong>HITS ONLY</strong>  -- show only certs matching your watchlist
+  <strong>Search box</strong> -- live filter by domain text</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">DETAIL INSPECTOR  (bottom strip)</div>
+      <div class="gs-body">Click any hit in the feed or alerts panel to inspect it.
+
+Shows: issuer, detection time, all SANs in the cert, match count.
+Per-match breakdown: matched domain vs watched pattern, detection method, score.</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">ACTIVE ALERTS  (right panel)</div>
+      <div class="gs-body">Chronological log of every hit this session, most recent first.
+Click any alert row to open it in the detail inspector.
+Selected alert is highlighted with a left border.</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">HIT NOTIFICATIONS</div>
+      <div class="gs-body">Every hit triggers a notification in the bottom-right corner showing the Kogane buddy,
+"DING-DONG DING-DONG DING-DONG", the matched domain, threat level, and score.
+Notifications auto-dismiss after 6 seconds. Click [X] to dismiss early.
+Multiple hits queue and display sequentially.</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">MATCHING ENGINE  --  FIVE LAYERS</div>
+      <div class="gs-body">  <strong>Exact clone</strong>      Score 100  --  domain registered as exact match (cross-TLD shadow)
+  <strong>Homoglyph</strong>       Score  91  --  paypa1.com, rnicosoft.com
+  <strong>Subdomain abuse</strong> Score  88  --  login.paypal.com.attacker.net
+  <strong>TLD swap</strong>        Score  82  --  paypal.net, google.io
+  <strong>Typosquat</strong>       Score 72-86 -- Levenshtein distance &lt;= 2
+  <strong>Brand embedded</strong>  Score  72  --  paypal-secure-login.com
+  <strong>Keyword present</strong> Score  72  --  keyword anywhere in domain
+  <strong>Fuzzy keyword</strong>   Score 43-68 -- fuzzy per-segment match
+
+Threat levels:  CRITICAL 90+  |  HIGH 75+  |  MEDIUM 55+  |  LOW &lt;55</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">HEADER CONTROLS</div>
+      <div class="gs-body">  <strong>SIM MODE</strong>  --  Toggle simulation on/off. Kogane auto-enables if CertStream unreachable.
+                 Simulation uses identical matching engine with seeded hits.
+                 Works on local file:// -- live mode requires HTTPS.
+
+  <strong>GUIDE</strong>     --  This overlay.
+
+  Connection dot:
+    Connecting   -- attempting CertStream WebSocket
+    Live Stream  -- receiving real global CT data
+    Sim Mode     -- running local simulation
+    Disconnected -- CertStream unreachable, sim active</div>
+    </div>
+
+    <div class="gs">
+      <div class="gs-title">TIPS</div>
+      <div class="gs-body">  -- Keep keywords at least 5 characters. Short terms produce false positives.
+  -- Add your own domain as type:domain to catch all five attack categories.
+  -- Scores above 85 on keyword patterns usually indicate genuine threats.
+  -- Host on GitHub Pages for live CertStream access (requires HTTPS).
+  -- The feed buffer holds 200 entries. Use HITS ONLY filter in busy sessions.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="logo" onclick="showSplash()" title="Show splash">
+    <pre class="logo-art">   ....   
+ .#+#%%%#=.
+ .:#:.....
+   .*@%+:.
+     .*=..</pre>
+    <span class="logo-name">KOGANE</span>
+  </div>
+  <div class="badge">CT THREAT HUNTER</div>
+  <div class="conn-wrap">
+    <div class="dot try" id="cd"></div>
+    <span id="cl" style="color:var(--text3)">CONNECTING</span>
+  </div>
+  <button class="hdr-btn" id="mtbtn" onclick="toggleMode()">SIM MODE</button>
+  <button class="hdr-btn guide-btn" onclick="openGuide()">GUIDE</button>
+  <div class="hdr-stats">
+    <div class="sblock"><span class="sval" id="ss">0</span><span class="slbl">SCANNED</span></div>
+    <div class="sblock"><span class="sval red" id="sm">0</span><span class="slbl">MATCHES</span></div>
+    <div class="sblock"><span class="sval" id="sr">0/s</span><span class="slbl">RATE</span></div>
+    <div class="sblock"><span class="sval" id="su">00:00:00</span><span class="slbl">UPTIME</span></div>
+  </div>
+</div>
+
+<!-- CAPTURE BAR -->
+<div id="cap-bar">
+  <span class="cap-state paused" id="cap-state">STOPPED</span>
+  <button class="cap-btn go" id="cap-start" onclick="captureStart()">[ START ]</button>
+  <button class="cap-btn stop" id="cap-stop" onclick="captureStop()" disabled style="opacity:.4">[ STOP ]</button>
+  <div class="cap-sep"></div>
+  <button class="cap-btn export" onclick="openReport()">[ EXPORT REPORT ]</button>
+  <div class="cap-sep"></div>
+  <span class="cap-meta">Capture: <span id="cap-dur">--:--:--</span></span>
+  <span class="cap-meta" style="margin-left:8px">Session alerts: <span id="cap-alert-count" style="font-weight:700;color:var(--text2)">0</span></span>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="sb">
+    <div class="ptitle"><span>WATCHLIST</span><button class="pt-clr" onclick="clearWatchlist()" title="Clear all watchlist patterns">CLEAR</button></div>
+    <div id="wl-items"></div>
+    <div id="add-form">
+      <div class="afl">ADD PATTERN</div>
+      <input class="fi" id="np" placeholder="domain or keyword..." onkeydown="if(event.key==='Enter')addPat()">
+      <div class="fr">
+        <select class="fs" id="pt"><option value="keyword">keyword</option><option value="domain">domain</option></select>
+        <button class="fb" onclick="addPat()">+ ADD</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="fbar">
+      <span class="flbl">SHOW:</span>
+      <button class="fbtn on" id="fa" onclick="setF('all')">ALL</button>
+      <button class="fbtn" id="fh" onclick="setF('hits')">HITS ONLY</button>
+      <input class="fi" id="si" placeholder="search domains..." oninput="renderFeed()" style="margin-left:auto;width:130px;padding:3px 7px;font-size:10px;">
+      <button class="pt-clr" onclick="clearFeed()" title="Clear certificate feed" style="flex-shrink:0">CLEAR</button>
+    </div>
+    <div id="feed"><div class="fempty">Kogane initializing...</div></div>
+    <div id="detail"><div class="dp">Click any [!] match to inspect.</div></div>
+  </div>
+
+  <div id="ap">
+    <div class="ptitle"><span>ACTIVE ALERTS</span><button class="pt-clr" onclick="clearAlerts()" title="Clear all alerts">CLEAR</button></div>
+
+    <!-- Filter controls -->
+    <div id="af-bar">
+      <div class="af-row">
+        <span class="af-lbl">SORT</span>
+        <select class="af-sel" id="af-sort" onchange="renderAlerts()">
+          <option value="time-desc">Time (newest)</option>
+          <option value="time-asc">Time (oldest)</option>
+          <option value="score-desc">Score (high)</option>
+          <option value="score-asc">Score (low)</option>
+        </select>
+      </div>
+      <div class="af-row">
+        <span class="af-lbl">WATCH</span>
+        <select class="af-sel" id="af-watch" onchange="renderAlerts()">
+          <option value="">All patterns</option>
+        </select>
+      </div>
+      <div class="af-row">
+        <span class="af-lbl">LEVEL</span>
+        <select class="af-sel" id="af-level" onchange="renderAlerts()">
+          <option value="">All levels</option>
+          <option value="90">Critical (90+)</option>
+          <option value="75">High (75+)</option>
+          <option value="55">Medium (55+)</option>
+          <option value="0">Low (&lt;55)</option>
+        </select>
+      </div>
+      <div class="af-row">
+        <span class="af-lbl">FROM</span>
+        <input class="af-inp" id="af-from" type="datetime-local" step="1" oninput="renderAlerts()" title="From date/time">
+      </div>
+      <div class="af-row">
+        <span class="af-lbl">TO</span>
+        <input class="af-inp" id="af-to" type="datetime-local" step="1" oninput="renderAlerts()" title="To date/time">
+        <button class="af-clear" onclick="clearAlertFilters()" title="Clear all filters">CLEAR</button>
+      </div>
+    </div>
+
+    <div class="af-count" id="af-count">0 alerts</div>
+    <div id="al"><div class="ae">No matches yet.<br><br>Kogane is watching<br>the global stream.</div></div>
+  </div>
+</div>
+
+<!-- REPORT MODAL -->
+<div id="rpt-modal">
+  <div id="rpt-box">
+    <div id="rpt-hdr">
+      <span id="rpt-title">KOGANE -- SESSION REPORT</span>
+      <button id="rpt-close" onclick="closeReport()">[ CLOSE ]</button>
+    </div>
+    <div id="rpt-fmts">
+      <span class="rpt-flbl">FORMAT:</span>
+      <button class="fmt-btn on" id="fmt-txt" onclick="setFmt('txt')">TEXT</button>
+      <button class="fmt-btn"   id="fmt-json" onclick="setFmt('json')">JSON</button>
+      <button class="fmt-btn"   id="fmt-csv"  onclick="setFmt('csv')">CSV</button>
+    </div>
+    <pre id="rpt-preview">Generating report...</pre>
+    <div id="rpt-footer">
+      <span id="rpt-summary"></span>
+      <button class="dl-btn" onclick="downloadReport()">[ DOWNLOAD ]</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification stack -->
+<div id="notif-stack"></div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ── Constants ── */
+const SK = 'kogane_v1';
+const NOTIF_DURATION = 6000;
+
+const BUDDY_ART =
+`                ++                                                                                  
+                +##*                                                                      ++        
+                 *###*+                                                            *+*#####+        
+                  **####**++*                                            **+****#########+=         
+                   *#*#########*+   =++****+**++               ++*****################*+            
+                    **##****#####+*###############*++        ++#################*####*              
+                     *****##*##*######################**=   +################*#####*+               
+                      **##+##*###########################*+*+#####***#########*##*+                 
+                        ++**#****#############+=-----+*####+*####*######***####*+                   
+                        +*#+----=############*---------=######**+######*####**                      
+                      +*#*------*#############*---------#######*######******                        
+                      *#*+----+##################*==-=+########*##**####+                           
+                     **############+=*#########################*===+**                              
+                     **###########*=-+#########################+                                    
+                      *#######################################*+                                    
+                      =*#####################################+*                                     
+                        *+*#**+*########+###**###########*=+=                                       
+                            +****++-=#*##########*****####*#+                                       
+                            +####***#*###################*##+                                       
+                            +###############################=                                       
+                            +*######***##################*#**                                       
+                             +*###*#*#**###############*###+                                        
+                              +=*#*****#############+*#*##*+                                        
+                                =*#########*####**#**##*#*=                                         
+                                ++####################*##+                                          
+                                =*###################**#+                                           
+                                 *#################**##+                                            
+                                 *+####**********##*##*+                                            
+                                 +##*##############*##+                                             
+                                 *################+*#*                                              
+                                  *##########**#####*                                               
+                                  +***++***###**###*                                                
+                                  *###########*##*+                                                 
+                                  +*#####****##*+                                                   
+                                   *###**###+=                                                      
+                                 *+**##***++                                                        
+                               +********+                                                           
+                              =+*##+*+*+                                                            
+                              =-=**++=                                                              
+                          ===== +=+                                                                 
+                       +=-==                                                                        
+                     +-=                                                                            
+                  +=-=                                                                              
+                 =-=                                                                                
+                =-+   =+===                                                                         
+               *-+   *--------==-==-=                                                               
+               =-=    =----------==                                                                 
+               +-=     *=------=*                                                                   
+                +--==--=------=                                                                     
+                       *-----=                                                                      
+                        ==--=`;
+
+/* ── Storage ── */
+function loadWL() {
+  try { const r = localStorage.getItem(SK); if (r) return JSON.parse(r); } catch (_) {}
+  return [
+    { id: 1, pattern: 'paypal',     type: 'keyword' },
+    { id: 2, pattern: 'google.com', type: 'domain'  },
+    { id: 3, pattern: 'microsoft',  type: 'keyword' },
+  ];
+}
+function saveWL() { try { localStorage.setItem(SK, JSON.stringify(WL)); } catch (_) {} }
+
+/* ── State ── */
+let WL      = loadWL();
+let feed    = [];
+let alerts  = [];
+let selId   = null;
+let fmode   = 'all';
+let seq     = 100;
+let scanned = 0;
+let matched = 0;
+let sim     = false;
+let rateN   = 0;
+let notifQueue = [];
+let notifBusy  = false;
+const t0 = Date.now();
+
+/* ── Splash ── */
+function dismissSplash() {
+  const s = document.getElementById('splash');
+  s.classList.add('out');
+  setTimeout(() => { s.style.display = 'none'; }, 460);
+}
+function showSplash() {
+  const s = document.getElementById('splash');
+  s.style.display = 'flex';
+  // Force reflow before removing class so transition fires
+  s.offsetHeight;
+  s.classList.remove('out');
+}
+
+/* ── Guide ── */
+function openGuide()  { document.getElementById('guide-overlay').classList.add('open'); }
+function closeGuide() { document.getElementById('guide-overlay').classList.remove('open'); }
+
+/* ── Levenshtein ── */
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  const d = [];
+  for (let i = 0; i <= m; i++) {
+    d[i] = new Array(n + 1).fill(0);
+    d[i][0] = i;
+  }
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      d[i][j] = a[i-1] === b[j-1]
+        ? d[i-1][j-1]
+        : 1 + Math.min(d[i-1][j], d[i][j-1], d[i-1][j-1]);
+  return d[m][n];
+}
+
+function cleanD(d)  { return d.toLowerCase().replace(/^\*\./, '').replace(/^www\./, ''); }
+function baseN(d)   { const p = d.split('.'); return p.length >= 2 ? p.slice(-2).join('.') : d; }
+function stripT(d)  { const p = d.split('.'); return p.length > 1 ? p.slice(0, -1).join('.') : d; }
+
+/* ── Matching engine ── */
+function analyze(raw, item) {
+  const d   = cleanD(raw);
+  const pat = item.pattern.toLowerCase();
+
+  if (item.type === 'domain') {
+    const pb = baseN(pat), db = baseN(d);
+    const pn = stripT(pb),  dn = stripT(db);
+
+    if (d === pat)               return { match: true, score: 100, label: 'Exact clone' };
+    if (d.endsWith('.' + pat))   return { match: true, score: 88,  label: 'Subdomain abuse' };
+
+    const hd = dn.replace(/0/g,'o').replace(/1/g,'l').replace(/rn/g,'m').replace(/vv/g,'w');
+    const hp = pn.replace(/0/g,'o').replace(/1/g,'l').replace(/rn/g,'m').replace(/vv/g,'w');
+    if (hd === hp && dn !== pn)  return { match: true, score: 91,  label: 'Homoglyph swap' };
+    if (db !== pb && dn === pn)  return { match: true, score: 82,  label: 'TLD swap' };
+
+    if (pn.length >= 5) {
+      const dist = lev(dn, pn);
+      if (dist > 0 && dist <= 2)
+        return { match: true, score: Math.round(86 - (dist / pn.length) * 30), label: 'Typosquat (\u0394' + dist + ')' };
+      if (dn.includes(pn) && d !== pat)
+        return { match: true, score: 72, label: 'Brand embedded' };
+    }
+  } else {
+    if (['.com','.net','.org','.io'].some(t => d === pat + t))
+      return { match: true, score: 90, label: 'Exact keyword TLD' };
+    if (d.includes(pat))
+      return { match: true, score: 72, label: 'Keyword present' };
+
+    const segs = d.replace(/\.[a-z]{2,6}$/, '').split(/[\.\-_]/);
+    for (const seg of segs) {
+      if (seg.length < 4) continue;
+      const th   = Math.max(1, Math.floor(pat.length * 0.22));
+      const dist = lev(seg, pat);
+      if (dist > 0 && dist <= th)
+        return { match: true, score: Math.round(68 - (dist / pat.length) * 25), label: 'Fuzzy keyword (\u0394' + dist + ')' };
+    }
+  }
+  return { match: false };
+}
+
+function tlvl(s) {
+  if (s >= 90) return { l: 'CRITICAL', c: 'tc' };
+  if (s >= 75) return { l: 'HIGH',     c: 'th' };
+  if (s >= 55) return { l: 'MEDIUM',   c: 'tm' };
+  return             { l: 'LOW',      c: 'tl' };
+}
+function scoreColor(s) {
+  if (s >= 90) return 'var(--red)';
+  if (s >= 75) return 'var(--orange)';
+  if (s >= 55) return 'var(--yellow)';
+  return 'var(--green)';
+}
+
+/* ── Process cert ── */
+function proc(cert) {
+  if (!capturing) return;   // only record when capture is running
+  const matches = [];
+  for (const dom of cert.domains)
+    for (const w of WL) {
+      const r = analyze(dom, w);
+      if (r.match) matches.push({ domain: dom, watched: w.pattern, ...r });
+    }
+
+  const entry = {
+    ...cert,
+    matches,
+    isHit:    matches.length > 0,
+    topScore: matches.length > 0 ? Math.max(...matches.map(m => m.score)) : 0,
+  };
+
+  feed.unshift(entry);
+  if (feed.length > 200) feed.length = 200;
+  scanned++; rateN++;
+
+  if (entry.isHit) {
+    matched++;
+    alerts.unshift(entry);
+    if (alerts.length > 50) alerts.length = 50;
+    if (capturing) {
+      sessionAlerts.unshift(entry);
+      document.getElementById('cap-alert-count').textContent = sessionAlerts.length;
+    }
+    queueNotif(entry);
+  }
+
+  updStats();
+  prepRow(entry);
+  if (entry.isHit) renderAlerts();
+}
+
+/* ── Notifications ── */
+function queueNotif(entry) {
+  notifQueue.push(entry);
+  if (!notifBusy) drainNotifQueue();
+}
+
+function drainNotifQueue() {
+  if (notifQueue.length === 0) { notifBusy = false; return; }
+  notifBusy = true;
+  const entry = notifQueue.shift();
+  showNotif(entry);
+}
+
+function showNotif(entry) {
+  const t    = tlvl(entry.topScore);
+  const dom  = entry.domains[0] || '';
+  const hm   = entry.matches[0];
+
+  const el = document.createElement('div');
+  el.className = 'notif';
+
+  el.innerHTML =
+    '<div class="notif-inner">' +
+      '<div class="notif-buddy"><pre>' + BUDDY_ART + '</pre></div>' +
+      '<div class="notif-content">' +
+        '<div class="notif-ding">DING-DONG DING-DONG DING-DONG!</div>' +
+        '<span class="notif-level tp ' + t.c + '">' + t.l + '</span>' +
+        '<div class="notif-domain">' + esc(dom) + '</div>' +
+        '<div class="notif-meta">' +
+          'vs <strong>' + esc(hm ? hm.watched : '?') + '</strong>' +
+          '  |  ' + esc(hm ? hm.label : '') +
+          '  |  score: <strong style="color:' + scoreColor(entry.topScore) + '">' + entry.topScore + '</strong>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<button class="notif-close" onclick="dismissNotif(this.parentElement)">&#215;</button>' +
+    '<div class="notif-bar" style="animation-duration:' + NOTIF_DURATION + 'ms"></div>';
+
+  document.getElementById('notif-stack').prepend(el);
+
+  // Auto-dismiss
+  const timer = setTimeout(() => dismissNotif(el), NOTIF_DURATION);
+  el._timer = timer;
+
+  // After this notif is done, show next in queue
+  el._done = () => {
+    clearTimeout(el._timer);
+    drainNotifQueue();
+  };
+}
+
+function dismissNotif(el) {
+  if (!el || !el.parentElement) return;
+  el.classList.add('out');
+  setTimeout(() => {
+    el.remove();
+    if (el._done) el._done();
+  }, 320);
+}
+
+/* ── Feed rendering ── */
+function buildRow(entry) {
+  const row = document.createElement('div');
+  row.className = 'cr' + (entry.isHit ? ' hit' : '');
+  if (entry.isHit) row.onclick = () => selEntry(entry);
+  const hm = entry.matches[0];
+  row.innerHTML =
+    '<span class="cts">' + ft(entry.ts) + '</span>' +
+    '<span class="cfl">' + (entry.isHit ? '[!]' : '') + '</span>' +
+    '<div class="cdo">' +
+      '<div class="cdm' + (entry.isHit ? ' h' : '') + '">' + esc(entry.domains[0] || '') + '</div>' +
+      (entry.isHit && hm
+        ? '<div class="pls">' +
+            '<span class="pl pl-l">' + esc(hm.label) + '</span>' +
+            '<span class="pl pl-w">vs ' + esc(hm.watched) + '</span>' +
+            '<span class="pl pl-s" style="color:' + scoreColor(entry.topScore) + '">' + entry.topScore + '</span>' +
+          '</div>'
+        : '') +
+    '</div>' +
+    '<span class="cis" title="' + esc(entry.issuer) + '">' + esc(entry.issuer) + '</span>';
+  return row;
+}
+
+function prepRow(entry) {
+  const el = document.getElementById('feed');
+  const q  = document.getElementById('si').value.toLowerCase();
+  if (fmode === 'hits' && !entry.isHit) return;
+  if (q && !entry.domains.some(d => d.toLowerCase().includes(q))) return;
+  const ph = el.querySelector('.fempty');
+  if (ph) ph.remove();
+  el.insertBefore(buildRow(entry), el.firstChild);
+  while (el.children.length > 120) el.removeChild(el.lastChild);
+}
+
+function renderFeed() {
+  const el = document.getElementById('feed');
+  const q  = document.getElementById('si').value.toLowerCase();
+  let v = feed;
+  if (fmode === 'hits') v = v.filter(e => e.isHit);
+  if (q) v = v.filter(e => e.domains.some(d => d.toLowerCase().includes(q)));
+  if (!v.length) { el.innerHTML = '<div class="fempty">No results for current filter.</div>'; return; }
+  el.innerHTML = '';
+  v.slice(0, 120).forEach(e => el.appendChild(buildRow(e)));
+}
+
+/* ── Alerts ── */
+function syncWatchFilter() {
+  const sel = document.getElementById('af-watch');
+  const cur = sel.value;
+  const opts = ['<option value="">All patterns</option>'];
+  const seen = new Set();
+  for (const a of alerts) {
+    for (const m of a.matches) {
+      if (!seen.has(m.watched)) {
+        seen.add(m.watched);
+        opts.push('<option value="' + esc(m.watched) + '"' + (cur === m.watched ? ' selected' : '') + '>' + esc(m.watched) + '</option>');
+      }
+    }
+  }
+  sel.innerHTML = opts.join('');
+}
+
+function clearAlertFilters() {
+  document.getElementById('af-sort').value  = 'time-desc';
+  document.getElementById('af-watch').value = '';
+  document.getElementById('af-level').value = '';
+  document.getElementById('af-from').value  = '';
+  document.getElementById('af-to').value    = '';
+  renderAlerts();
+}
+
+function renderAlerts() {
+  syncWatchFilter();
+  const el       = document.getElementById('al');
+  const countEl  = document.getElementById('af-count');
+  const sort     = document.getElementById('af-sort').value;
+  const watch    = document.getElementById('af-watch').value;
+  const levelMin = document.getElementById('af-level').value;
+  const fromVal  = document.getElementById('af-from').value;
+  const toVal    = document.getElementById('af-to').value;
+  const fromTs   = fromVal ? new Date(fromVal).getTime() : null;
+  const toTs     = toVal   ? new Date(toVal).getTime()   : null;
+
+  if (!alerts.length) {
+    el.innerHTML = '<div class="ae">No matches yet.<br><br>Kogane is watching<br>the global stream.</div>';
+    if (countEl) countEl.textContent = '0 alerts';
+    return;
+  }
+
+  let visible = [...alerts];
+
+  // Filter by watchlist pattern
+  if (watch) {
+    visible = visible.filter(a => a.matches.some(m => m.watched === watch));
+  }
+
+  // Filter by threat level band
+  if (levelMin !== '') {
+    const min = parseInt(levelMin, 10);
+    if (min === 0) {
+      visible = visible.filter(a => a.topScore < 55);
+    } else {
+      visible = visible.filter(a => a.topScore >= min);
+    }
+  }
+
+  // Filter by time range
+  if (fromTs !== null) visible = visible.filter(a => new Date(a.ts).getTime() >= fromTs);
+  if (toTs   !== null) visible = visible.filter(a => new Date(a.ts).getTime() <= toTs);
+
+  // Sort
+  visible.sort((x, y) => {
+    if (sort === 'time-desc')  return new Date(y.ts) - new Date(x.ts);
+    if (sort === 'time-asc')   return new Date(x.ts) - new Date(y.ts);
+    if (sort === 'score-desc') return y.topScore - x.topScore;
+    if (sort === 'score-asc')  return x.topScore - y.topScore;
+    return 0;
+  });
+
+  if (countEl) countEl.textContent = visible.length + ' of ' + alerts.length + ' alert' + (alerts.length !== 1 ? 's' : '');
+
+  if (!visible.length) {
+    el.innerHTML = '<div class="ae">No alerts match<br>current filters.</div>';
+    return;
+  }
+
+  el.innerHTML = visible.map(a => {
+    const t = tlvl(a.topScore);
+    const ts = a.ts instanceof Date ? a.ts : new Date(a.ts);
+    const timeStr = ts.toLocaleTimeString('en-US', { hour12: false });
+    const dateStr = ts.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+    // Show which watched patterns matched (deduplicated)
+    const watchedStr = [...new Set(a.matches.map(m => m.watched))].join(', ');
+    return '<div class="ar' + (selId === a.id ? ' sel' : '') + '" onclick="selEntry(' + a.id + ')">' +
+      '<div class="adn">' + esc(a.domains[0] || '') + '</div>' +
+      '<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">vs ' + esc(watchedStr) + '</div>' +
+      '<div class="ab">' +
+        '<span class="tp ' + t.c + '">' + t.l + ' ' + a.topScore + '</span>' +
+        '<span class="at">' + dateStr + ' ' + timeStr + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ── Detail ── */
+function selEntry(eOrId) {
+  let entry = typeof eOrId === 'number'
+    ? (alerts.find(a => a.id === eOrId) || feed.find(x => x.id === eOrId))
+    : eOrId;
+  if (!entry) return;
+  if (entry.ts && typeof entry.ts === 'string') entry.ts = new Date(entry.ts);
+  selId = entry.id;
+  renderAlerts();
+  const t = tlvl(entry.topScore);
+  document.getElementById('detail').innerHTML =
+    '<div class="dh">' +
+      '<span class="dn">' + esc(entry.domains[0] || '') + '</span>' +
+      '<span class="tp ' + t.c + '">' + t.l + ' \u00b7 ' + entry.topScore + '/100</span>' +
+    '</div>' +
+    '<div class="dm">' +
+      '<div class="di"><div class="dl">ISSUER</div><div class="dv">' + esc(entry.issuer) + '</div></div>' +
+      '<div class="di"><div class="dl">DETECTED</div><div class="dv">' + ft(entry.ts) + '</div></div>' +
+      '<div class="di"><div class="dl">ALL DOMAINS</div><div class="dv" title="' + esc((entry.domains||[]).join(', ')) + '">' + esc((entry.domains||[]).join(', ')) + '</div></div>' +
+      '<div class="di"><div class="dl">MATCHES</div><div class="dv">' + (entry.matches||[]).length + '</div></div>' +
+    '</div>' +
+    '<div class="mrs">' +
+      (entry.matches||[]).map(m =>
+        '<div class="mr">' +
+          '<span class="mrd">' + esc(m.domain) + '</span>' +
+          '<span class="mrv">vs</span>' +
+          '<span class="mrw">' + esc(m.watched) + '</span>' +
+          '<span class="mrl">' + esc(m.label) + '</span>' +
+          '<span class="mrc" style="color:' + scoreColor(m.score) + '">' + m.score + '</span>' +
+        '</div>'
+      ).join('') +
+    '</div>';
+}
+
+/* ── Watchlist CRUD ── */
+function renderWL() {
+  const el = document.getElementById('wl-items');
+  if (!WL.length) {
+    el.innerHTML = '<div class="wl-empty">No patterns.<br>Add one below.</div>';
+    return;
+  }
+  el.innerHTML = WL.map(w =>
+    '<div class="we">' +
+      '<span class="wp" title="' + esc(w.pattern) + '">' + esc(w.pattern) + '</span>' +
+      '<span class="wt">' + (w.type === 'domain' ? 'DOM' : 'KW') + '</span>' +
+      '<button class="wd" onclick="remPat(' + w.id + ')">&#215;</button>' +
+    '</div>'
+  ).join('');
+}
+
+function addPat() {
+  const inp = document.getElementById('np');
+  const sel = document.getElementById('pt');
+  const pat = inp.value.trim().toLowerCase();
+  if (!pat) return;
+  if (WL.some(w => w.pattern === pat && w.type === sel.value)) { toast('Already in watchlist'); return; }
+  WL.push({ id: ++seq, pattern: pat, type: sel.value });
+  inp.value = '';
+  saveWL();
+  renderWL();
+
+  // Retroactively re-score feed
+  for (const e of feed) {
+    const nm = [];
+    for (const dom of e.domains)
+      for (const w of WL) {
+        const r = analyze(dom, w);
+        if (r.match) nm.push({ domain: dom, watched: w.pattern, ...r });
+      }
+    e.matches   = nm;
+    e.isHit     = nm.length > 0;
+    e.topScore  = nm.length > 0 ? Math.max(...nm.map(m => m.score)) : 0;
+    if (e.isHit && !alerts.find(a => a.id === e.id)) { alerts.unshift(e); matched++; }
+  }
+  renderAlerts();
+  updStats();
+  toast('Watching: ' + pat);
+}
+
+function remPat(id) {
+  WL = WL.filter(w => w.id !== id);
+  saveWL();
+  renderWL();
+}
+
+/* ── Filter ── */
+function setF(m) {
+  fmode = m;
+  document.getElementById('fa').classList.toggle('on', m === 'all');
+  document.getElementById('fh').classList.toggle('on', m === 'hits');
+  renderFeed();
+}
+
+/* ── Stats ticker ── */
+let rH = [];
+setInterval(() => {
+  rH.push(rateN);
+  if (rH.length > 5) rH.shift();
+  document.getElementById('sr').textContent =
+    (rH.reduce((a, b) => a + b, 0) / rH.length).toFixed(1) + '/s';
+  rateN = 0;
+  document.getElementById('su').textContent = fmtU(Math.floor((Date.now() - t0) / 1000));
+}, 1000);
+
+function updStats() {
+  document.getElementById('ss').textContent = scanned.toLocaleString();
+  document.getElementById('sm').textContent = matched;
+}
+
+/* ── Simulation ── */
+const ISS  = ["Let's Encrypt","DigiCert","Sectigo","Google Trust","ZeroSSL","GlobalSign","Amazon"];
+const TLDS = ['.com','.net','.org','.io','.co','.app','.dev','.xyz','.site','.online','.tech','.store'];
+const PFX  = ['www','mail','api','app','secure','login','portal','admin','cdn','auth','shop','pay','id','my'];
+const MUTS = [
+  s => s.replace(/o/g,'0').replace(/l/g,'1'),
+  s => s.replace(/m/g,'rn').replace(/vv/g,'w'),
+  s => s + s.slice(-1),
+  s => s.slice(0, -1),
+  s => s + '-secure',
+  s => s + '-login',
+  s => 'secure-' + s,
+  s => 'login-' + s,
+  s => s + 'online',
+  s => s[0] + s,
+  s => s + 'app',
+  s => 'my' + s,
+];
+
+let simHitIn = 8 + Math.floor(Math.random() * 14);
+let simCount = 0;
+
+function randStr(n) {
+  const c = 'abcdefghijklmnopqrstuvwxyz';
+  let s = '';
+  for (let i = 0; i < n; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+
+function genCert(hit) {
+  const iss = ISS[Math.floor(Math.random() * ISS.length)];
+  if (hit && WL.length) {
+    const tw   = WL[Math.floor(Math.random() * WL.length)];
+    const base = tw.type === 'domain' ? tw.pattern.split('.')[0] : tw.pattern;
+    const mut  = MUTS[Math.floor(Math.random() * MUTS.length)](base);
+    const tld  = TLDS[Math.floor(Math.random() * TLDS.length)];
+    const pfx  = Math.random() > 0.5 ? PFX[Math.floor(Math.random() * PFX.length)] + '.' : '';
+    return { id: ++seq, domains: [pfx + mut + tld], issuer: iss, ts: new Date() };
+  }
+  const word = randStr(4 + Math.floor(Math.random() * 9));
+  const tld  = TLDS[Math.floor(Math.random() * TLDS.length)];
+  const pfx  = Math.random() > 0.55 ? PFX[Math.floor(Math.random() * PFX.length)] + '.' : '';
+  const wc   = Math.random() > 0.84;
+  const base = word + tld;
+  return { id: ++seq, domains: wc ? ['*.' + base, base] : [pfx + base], issuer: iss, ts: new Date() };
+}
+
+function simLoop() {
+  if (!sim) return;
+  simCount++;
+  const hit = simCount >= simHitIn && WL.length > 0;
+  if (hit) { simCount = 0; simHitIn = 8 + Math.floor(Math.random() * 16); }
+  proc(genCert(hit));
+  setTimeout(simLoop, 140 + Math.random() * 360);
+}
+
+function startSim() {
+  if (sim) return;
+  sim = true;
+  setConn('sim', 'SIM MODE', 'var(--orange)');
+  document.getElementById('mtbtn').textContent = 'SIM ON';
+  simLoop();
+}
+
+function stopSim() {
+  sim = false;
+  document.getElementById('mtbtn').textContent = 'SIM MODE';
+}
+
+function toggleMode() { sim ? stopSim() : startSim(); }
+
+/* ── CertStream ── */
+function connect() {
+  setConn('try', 'CONNECTING...', 'var(--text3)');
+  try {
+    const ws = new WebSocket('wss://certstream.calidog.io/');
+
+    const fallback = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        ws.close();
+        toast('CertStream unreachable -- starting sim mode');
+        startSim();
+      }
+    }, 5000);
+
+    ws.onopen = () => {
+      clearTimeout(fallback);
+      setConn('live', 'LIVE STREAM', 'var(--green)');
+      document.getElementById('mtbtn').textContent = 'SIM MODE';
+      toast('Connected to CertStream -- live global feed active');
+    };
+
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.message_type === 'certificate_update') {
+          const c = d.data.leaf_cert;
+          proc({
+            id:      ++seq,
+            domains: c.all_domains || [],
+            issuer:  (c.issuer && (c.issuer.O || c.issuer.CN)) || 'Unknown',
+            ts:      new Date(),
+          });
+        }
+      } catch (_) {}
+    };
+
+    ws.onerror = () => {};
+
+    ws.onclose = () => {
+      setConn('err', 'DISCONNECTED', 'var(--red)');
+      if (!sim) {
+        toast('CertStream disconnected -- switching to sim mode');
+        setTimeout(startSim, 1200);
+      }
+    };
+
+  } catch (_) {
+    setConn('err', 'WS BLOCKED', 'var(--red)');
+    startSim();
+  }
+}
+
+function setConn(state, label, color) {
+  document.getElementById('cd').className = 'dot ' + state;
+  const el = document.getElementById('cl');
+  el.textContent  = label;
+  el.style.color  = color;
+}
+
+/* ── Utilities ── */
+function ft(ts) {
+  const d = ts instanceof Date ? ts : new Date(ts);
+  return d.toLocaleTimeString('en-US', { hour12: false });
+}
+function fmtU(s) {
+  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]
+    .map(n => String(n).padStart(2, '0')).join(':');
+}
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 2800);
+}
+
+/* ── Capture controls ── */
+let capturing    = false;
+let captureStart_ts = null;
+let captureStop_ts  = null;
+let captureDurTimer = null;
+let sessionAlerts   = [];   // alerts accumulated during current capture
+
+function captureStart() {
+  if (capturing) return;
+  capturing       = true;
+  captureStart_ts = new Date();
+  captureStop_ts  = null;
+  sessionAlerts   = [];
+  document.getElementById('cap-state').className = 'cap-state running';
+  document.getElementById('cap-state').textContent = 'RUNNING';
+  document.getElementById('cap-start').disabled  = true;
+  document.getElementById('cap-start').style.opacity = '.4';
+  document.getElementById('cap-stop').disabled   = false;
+  document.getElementById('cap-stop').style.opacity  = '1';
+  document.getElementById('cap-alert-count').textContent = '0';
+
+  captureDurTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - captureStart_ts.getTime()) / 1000);
+    document.getElementById('cap-dur').textContent = fmtU(elapsed);
+  }, 1000);
+
+  toast('Capture started');
+}
+
+function captureStop() {
+  if (!capturing) return;
+  capturing      = false;
+  captureStop_ts = new Date();
+  clearInterval(captureDurTimer);
+  document.getElementById('cap-state').className  = 'cap-state paused';
+  document.getElementById('cap-state').textContent = 'STOPPED';
+  document.getElementById('cap-start').disabled   = false;
+  document.getElementById('cap-start').style.opacity = '1';
+  document.getElementById('cap-stop').disabled    = true;
+  document.getElementById('cap-stop').style.opacity  = '.4';
+  toast('Capture stopped -- ' + sessionAlerts.length + ' alert(s) recorded');
+}
+
+// Hook proc() to track session alerts
+const _origProc = proc;
+// We'll intercept inside proc itself via a flag check below
+
+/* ── Panel clear functions ── */
+function clearFeed() {
+  feed = [];
+  document.getElementById('feed').innerHTML = '<div class="fempty">Feed cleared.</div>';
+  scanned = 0;
+  updStats();
+  toast('Feed cleared');
+}
+
+function clearAlerts() {
+  alerts      = [];
+  sessionAlerts = [];
+  selId       = null;
+  matched     = 0;
+  document.getElementById('cap-alert-count').textContent = '0';
+  renderAlerts();
+  updStats();
+  document.getElementById('detail').innerHTML = '<div class="dp">Click any [!] match to inspect.</div>';
+  toast('Alerts cleared');
+}
+
+function clearWatchlist() {
+  if (!WL.length) return;
+  WL = [];
+  saveWL();
+  renderWL();
+  toast('Watchlist cleared');
+}
+
+/* ── Report ── */
+let rptFmt = 'txt';
+
+function openReport() {
+  document.getElementById('rpt-modal').classList.add('open');
+  buildPreview();
+}
+function closeReport() {
+  document.getElementById('rpt-modal').classList.remove('open');
+}
+function setFmt(f) {
+  rptFmt = f;
+  ['txt','json','csv'].forEach(x => {
+    document.getElementById('fmt-' + x).classList.toggle('on', x === f);
+  });
+  buildPreview();
+}
+
+function buildPreview() {
+  const src    = capturing ? alerts : (sessionAlerts.length ? sessionAlerts : alerts);
+  const report = generateReport(rptFmt, src);
+  document.getElementById('rpt-preview').textContent = report;
+  const lines  = report.split('\n').length;
+  const bytes  = new Blob([report]).size;
+  document.getElementById('rpt-summary').textContent =
+    src.length + ' alert(s)  |  ' + lines + ' lines  |  ' + (bytes > 1024 ? (bytes/1024).toFixed(1) + ' KB' : bytes + ' B');
+}
+
+function generateReport(fmt, src) {
+  const now    = new Date();
+  const capDur = captureStart_ts
+    ? fmtU(Math.floor(((captureStop_ts || now) - captureStart_ts) / 1000))
+    : '--:--:--';
+
+  if (fmt === 'json') {
+    const obj = {
+      kogane_report: {
+        generated:      now.toISOString(),
+        capture_start:  captureStart_ts ? captureStart_ts.toISOString() : null,
+        capture_stop:   captureStop_ts  ? captureStop_ts.toISOString()  : null,
+        capture_duration: capDur,
+        watchlist:      WL.map(w => ({ pattern: w.pattern, type: w.type })),
+        stats: {
+          total_scanned: scanned,
+          total_alerts:  src.length,
+          critical: src.filter(a => a.topScore >= 90).length,
+          high:     src.filter(a => a.topScore >= 75 && a.topScore < 90).length,
+          medium:   src.filter(a => a.topScore >= 55 && a.topScore < 75).length,
+          low:      src.filter(a => a.topScore < 55).length,
+        },
+        alerts: src.map(a => ({
+          id:         a.id,
+          timestamp:  new Date(a.ts).toISOString(),
+          domain:     a.domains[0] || '',
+          all_domains: a.domains,
+          issuer:     a.issuer,
+          top_score:  a.topScore,
+          threat:     tlvl(a.topScore).l,
+          matches:    a.matches.map(m => ({
+            domain:  m.domain,
+            watched: m.watched,
+            label:   m.label,
+            score:   m.score,
+          })),
+        })),
+      }
+    };
+    return JSON.stringify(obj, null, 2);
+  }
+
+  if (fmt === 'csv') {
+    const rows = [
+      ['timestamp','domain','all_domains','issuer','top_score','threat','matched_pattern','match_label','match_score'].join(',')
+    ];
+    for (const a of src) {
+      const ts     = new Date(a.ts).toISOString();
+      const dom    = '"' + (a.domains[0] || '').replace(/"/g,'""') + '"';
+      const allD   = '"' + a.domains.join('; ').replace(/"/g,'""') + '"';
+      const iss    = '"' + a.issuer.replace(/"/g,'""') + '"';
+      const threat = tlvl(a.topScore).l;
+      if (!a.matches.length) {
+        rows.push([ts, dom, allD, iss, a.topScore, threat, '', '', ''].join(','));
+      } else {
+        for (const m of a.matches) {
+          const wp = '"' + m.watched.replace(/"/g,'""') + '"';
+          const ml = '"' + m.label.replace(/"/g,'""') + '"';
+          rows.push([ts, dom, allD, iss, a.topScore, threat, wp, ml, m.score].join(','));
+        }
+      }
+    }
+    return rows.join('\n');
+  }
+
+  // Plain text
+  const line80 = '='.repeat(80);
+  const line40 = '-'.repeat(40);
+  let out = '';
+  out += line80 + '\n';
+  out += 'KOGANE -- CERTIFICATE TRANSPARENCY THREAT HUNTER\n';
+  out += 'SESSION REPORT\n';
+  out += line80 + '\n\n';
+  out += 'Generated:        ' + now.toLocaleString() + '\n';
+  out += 'Capture start:    ' + (captureStart_ts ? captureStart_ts.toLocaleString() : 'N/A') + '\n';
+  out += 'Capture stop:     ' + (captureStop_ts  ? captureStop_ts.toLocaleString()  : 'N/A') + '\n';
+  out += 'Capture duration: ' + capDur + '\n';
+  out += 'Certs scanned:    ' + scanned.toLocaleString() + '\n\n';
+
+  out += 'WATCHLIST\n' + line40 + '\n';
+  if (!WL.length) { out += '  (empty)\n'; }
+  else { WL.forEach(w => { out += '  [' + (w.type === 'domain' ? 'DOM' : 'KW ') + ']  ' + w.pattern + '\n'; }); }
+  out += '\n';
+
+  out += 'SUMMARY\n' + line40 + '\n';
+  out += '  Total alerts:  ' + src.length + '\n';
+  out += '  CRITICAL (90+): ' + src.filter(a => a.topScore >= 90).length + '\n';
+  out += '  HIGH     (75+): ' + src.filter(a => a.topScore >= 75 && a.topScore < 90).length + '\n';
+  out += '  MEDIUM   (55+): ' + src.filter(a => a.topScore >= 55 && a.topScore < 75).length + '\n';
+  out += '  LOW      (<55): ' + src.filter(a => a.topScore < 55).length + '\n\n';
+
+  // Pattern hit counts
+  const hitMap = {};
+  for (const a of src) for (const m of a.matches) { hitMap[m.watched] = (hitMap[m.watched] || 0) + 1; }
+  if (Object.keys(hitMap).length) {
+    out += 'PATTERN HIT COUNTS\n' + line40 + '\n';
+    Object.entries(hitMap).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => {
+      out += '  ' + v.toString().padStart(4) + 'x  ' + k + '\n';
+    });
+    out += '\n';
+  }
+
+  out += 'ALERTS  (' + src.length + ')\n' + line80 + '\n\n';
+  const sorted = [...src].sort((a,b) => new Date(b.ts) - new Date(a.ts));
+  sorted.forEach((a, i) => {
+    const t  = tlvl(a.topScore);
+    const ts = new Date(a.ts);
+    out += '[' + String(i+1).padStart(3,'0') + ']  ' + t.l.padEnd(8) + '  Score: ' + String(a.topScore).padStart(3) + '  ' + ts.toISOString() + '\n';
+    out += '       Domain:  ' + (a.domains[0] || '') + '\n';
+    if (a.domains.length > 1) out += '       SANs:    ' + a.domains.slice(1).join(', ') + '\n';
+    out += '       Issuer:  ' + a.issuer + '\n';
+    a.matches.forEach(m => {
+      out += '       MATCH    ' + m.label.padEnd(22) + ' vs "' + m.watched + '"  score:' + m.score + '\n';
+    });
+    out += '\n';
+  });
+
+  out += line80 + '\n';
+  out += 'END OF REPORT -- KOGANE\n';
+  out += line80 + '\n';
+  return out;
+}
+
+function downloadReport() {
+  const src  = capturing ? alerts : (sessionAlerts.length ? sessionAlerts : alerts);
+  const text = generateReport(rptFmt, src);
+  const ext  = rptFmt === 'json' ? 'json' : rptFmt === 'csv' ? 'csv' : 'txt';
+  const ts   = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const name = 'kogane-report-' + ts + '.' + ext;
+  const mime = rptFmt === 'json' ? 'application/json' : rptFmt === 'csv' ? 'text/csv' : 'text/plain';
+  const blob = new Blob([text], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Downloaded: ' + name);
+}
+
+/* ── Boot ── */
+renderWL();
+connect();
+</script>
+</body>
+</html>
