@@ -15,8 +15,7 @@
   --hit-bg:#f0fff0;--hit-border:#88bb88;
   --font:'Cascadia Code','Fira Code',Consolas,'Courier New',monospace;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;overflow:hidden}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border)}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;overflow:hidden}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border)}
 
 /* ── SPLASH ── */
 #splash{position:fixed;inset:0;background:#fff;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:opacity .45s ease;overflow:hidden}
@@ -48,12 +47,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .hdr-btn.guide-btn{border-color:var(--text);color:var(--text);font-weight:700}
 
 /* ── LAYOUT ── */
-#app{height:calc(100vh - 40px);display:flex}
+body{display:flex;flex-direction:column}
+#app{flex:1;display:flex;min-height:0;overflow:hidden}
 
 /* ── SIDEBAR ── */
-#sb{width:205px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
-.ptitle{padding:5px 11px;font-size:8px;letter-spacing:2px;color:var(--text3);background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
-#wl-items{flex:1;overflow-y:auto;padding:7px}
+#sb{width:210px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#wl-items{flex:1;overflow-y:auto;padding:7px;min-height:0}
 .we{display:flex;align-items:center;gap:5px;padding:4px 7px;margin-bottom:3px;background:var(--bg2);border:1px solid var(--border);border-radius:1px;animation:slin .15s ease}
 @keyframes slin{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
 .wp{flex:1;font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -66,12 +65,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .fi{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;padding:4px 7px;width:100%;outline:none;border-radius:1px}
 .fi:focus{border-color:var(--text)}.fi::placeholder{color:var(--text3)}
 .fr{display:flex;gap:4px}
-.fs{background:var(--bg);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:10px;padding:3px 5px;outline:none;flex:1;border-radius:1px}
+.fs{background:var(--bg);border:1px solid var(--border2);color:var(--text2);font-family:var(--font);font-size:10px;padding:3px 5px;outline:none;flex:1;min-width:70px;border-radius:1px}
 .fb{background:var(--text);border:1px solid var(--text);color:var(--bg);font-family:var(--font);font-size:10px;padding:4px 9px;cursor:pointer;border-radius:1px;flex-shrink:0}
 .fb:hover{background:var(--text2);border-color:var(--text2)}
 
 /* ── MAIN ── */
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;min-height:0}
 #fbar{display:flex;align-items:center;gap:7px;padding:4px 11px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
 .flbl{font-size:8px;color:var(--text3);letter-spacing:1px}
 .fbtn{font-family:var(--font);font-size:9px;letter-spacing:.5px;padding:2px 7px;border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;border-radius:1px}
@@ -79,7 +78,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .fbtn:hover:not(.on){color:var(--text)}
 #si{margin-left:auto;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:10px;padding:3px 7px;outline:none;border-radius:1px;width:155px}
 #si::placeholder{color:var(--text3)}#si:focus{border-color:var(--text)}
-#feed{flex:1;overflow-y:auto}
+#feed{flex:1;overflow-y:auto;min-height:0}
 .fempty{color:var(--text3);font-size:11px;padding:14px 12px}
 .cr{display:flex;align-items:flex-start;padding:3px 11px;border-bottom:1px solid var(--border);min-height:24px;animation:fin .18s ease}
 @keyframes fin{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
@@ -119,8 +118,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mrc{flex-shrink:0;font-weight:700;font-size:11px}
 
 /* ── ALERTS PANEL ── */
-#ap{width:260px;flex-shrink:0;border-left:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
-#al{flex:1;overflow-y:auto}
+#ap{width:260px;flex-shrink:0;border-left:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#al{flex:1;overflow-y:auto;min-height:0}
 .ae{color:var(--text3);font-size:10px;padding:13px 11px;line-height:2.1}
 .ar{padding:6px 9px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .08s}
 .ar:hover{background:var(--bg2)}.ar.sel{background:var(--bg3);border-left:3px solid var(--text)}
@@ -453,9 +452,11 @@ Threat levels:  CRITICAL 90+  |  HIGH 75+  |  MEDIUM 55+  |  LOW &lt;55</div>
     <div id="wl-items"></div>
     <div id="add-form">
       <div class="afl">ADD PATTERN</div>
-      <input class="fi" id="np" placeholder="domain or keyword..." onkeydown="if(event.key==='Enter')addPat()">
       <div class="fr">
         <select class="fs" id="pt"><option value="keyword">keyword</option><option value="domain">domain</option></select>
+      </div>
+      <div class="fr">
+        <input class="fi" id="np" placeholder="domain or keyword..." onkeydown="if(event.key==='Enter')addPat()" style="flex:1;width:auto">
         <button class="fb" onclick="addPat()">+ ADD</button>
       </div>
     </div>
