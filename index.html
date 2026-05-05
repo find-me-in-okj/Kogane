@@ -60,7 +60,7 @@ body{display:flex;flex-direction:column}
 .wd{background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:0 2px;line-height:1;font-family:var(--font);flex-shrink:0}
 .wd:hover{color:var(--red)}
 .wl-empty{color:var(--text3);font-size:10px;padding:10px;line-height:1.8}
-#add-form{padding:7px;border-top:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+#add-form{padding:6px 8px 8px 8px;border-top:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;gap:4px;flex-shrink:0;box-sizing:border-box}
 .afl{font-size:8px;color:var(--text3);letter-spacing:1px}
 .fi{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:11px;padding:4px 7px;width:100%;outline:none;border-radius:1px}
 .fi:focus{border-color:var(--text)}.fi::placeholder{color:var(--text3)}
@@ -452,12 +452,10 @@ Threat levels:  CRITICAL 90+  |  HIGH 75+  |  MEDIUM 55+  |  LOW &lt;55</div>
     <div id="wl-items"></div>
     <div id="add-form">
       <div class="afl">ADD PATTERN</div>
-      <div class="fr">
-        <select class="fs" id="pt"><option value="keyword">keyword</option><option value="domain">domain</option></select>
-      </div>
-      <div class="fr">
-        <input class="fi" id="np" placeholder="domain or keyword..." onkeydown="if(event.key==='Enter')addPat()" style="flex:1;width:auto">
-        <button class="fb" onclick="addPat()">+ ADD</button>
+      <select class="fs" id="pt" style="width:100%;margin-bottom:2px"><option value="keyword">keyword</option><option value="domain">domain</option></select>
+      <div class="fr" style="overflow:hidden">
+        <input class="fi" id="np" placeholder="domain or keyword..." onkeydown="if(event.key==='Enter')addPat()" style="flex:1;min-width:0;width:0">
+        <button class="fb" onclick="addPat()" style="flex-shrink:0;white-space:nowrap">+ ADD</button>
       </div>
     </div>
   </div>
